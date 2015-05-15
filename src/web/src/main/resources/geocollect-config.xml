@@ -80,7 +80,7 @@
     <util:map id="connectionProperties">
         <entry key="dbtype" value="postgis"/>
         <entry key="database" value="genova"/>
-        <entry key="host" value="localhost"/>
+        <entry key="host" value="192.168.1.69"/>
         <entry key="port" value="5432"/>
         <entry key="schema" value="public"/>
         <entry key="user" value="postgres"/>

@@ -23,10 +23,14 @@ package it.geosolutions.opensdi2.mvc;
 import it.geosolutions.geocollect.model.http.CommitResponse;
 import it.geosolutions.geocollect.model.http.Status;
 import it.geosolutions.opensdi2.workflow.ActionSequence;
+import it.geosolutions.opensdi2.workflow.BaseAction;
+import it.geosolutions.opensdi2.workflow.BlockConfiguration;
 import it.geosolutions.opensdi2.workflow.WorkflowContext;
 import it.geosolutions.opensdi2.workflow.WorkflowException;
 import it.geosolutions.opensdi2.workflow.WorkflowStatus;
 import it.geosolutions.opensdi2.workflow.action.DataStoreConfiguration;
+import it.geosolutions.opensdi2.workflow.action.FeatureUpdater;
+import it.geosolutions.opensdi2.workflow.action.FeatureUpdaterConfiguration;
 
 import java.util.List;
 import java.util.Map;
@@ -35,6 +39,7 @@ import org.apache.log4j.Logger;
 import org.json.simple.JSONObject;
 import org.opengis.filter.identity.FeatureId;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -53,6 +58,9 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @PreAuthorize("!hasRole('ROLE_ANONYMOUS')")
 public class GeoCollectActionController {
 	
+    @Autowired
+    private ApplicationContext appContext;
+    
 	/**
 	 * Context object to store data to
 	 */
@@ -83,9 +91,96 @@ public class GeoCollectActionController {
 	private Map<String, ActionSequence> actionsMapping;
 	
 	/**
+	 * Mapping of the various configurable actions
+	 */
+	@Autowired
+	private Map<String, BaseAction> configurableAction;
+	
+	/**
 	 * Logger
 	 */
 	private final static Logger LOGGER = Logger.getLogger(GeoCollectActionController.class);
+	
+	@RequestMapping(value = "/{action}/configuration", method = { RequestMethod.GET })
+	public @ResponseBody Object getConfigurationList(
+	       @PathVariable("action") String action){
+
+	    BlockConfiguration ret = null;
+	    LOGGER.info("Received call for Action Configuration:" + action);
+	    
+	    if(configurableAction.get(action) != null){
+    	    ret =  configurableAction.get(action).getConfiguration();
+    	    
+    	    if(ret != null){
+    	        return ret;
+    	    }
+	    }
+	    for(String ba_idx : configurableAction.keySet()){
+	        BaseAction ba = configurableAction.get(ba_idx);
+	        if(ba != null && ba instanceof FeatureUpdater){
+	            ret = ba.getConfiguration();
+	            if(ret != null){
+	                LOGGER.info("Retrieved BlockConfiguration of "+ba_idx);
+	                return ret;
+	            }
+	        }
+	    }
+	    
+	    return ret;
+    }
+	
+	/**
+	 * 
+	 * @param action
+	 * @return
+	 */
+    @RequestMapping(value = "/{action}/configuration", method = { RequestMethod.POST })
+    public @ResponseBody Object setActionConfiguration(
+           @PathVariable("action") String action,
+           @RequestBody JSONObject body){
+
+        LOGGER.info(body.toJSONString());
+        
+        BlockConfiguration ret = null;
+        LOGGER.info("Received call to set Action Configuration:" + action);
+        
+        if(configurableAction.get(action) != null){
+            ret =  configurableAction.get(action).getConfiguration();
+            
+            if(ret == null){
+                
+                for(String ba_idx : configurableAction.keySet()){
+                    BaseAction ba = configurableAction.get(ba_idx);
+                    if(ba != null && ba instanceof FeatureUpdater){
+                        ret = ba.getConfiguration();
+                        
+                    }
+                }
+                
+            }
+            
+            if(ret != null){
+                
+                LOGGER.info("Retrieved BlockConfiguration of "+action);
+                
+                if(ret instanceof FeatureUpdaterConfiguration){
+                    
+                    LOGGER.info("Got a FeatureUpdaterConfiguration");
+                }
+
+                CommitResponse r = new CommitResponse();
+                r.setStatus(Status.SUCCESS);
+                return r;
+            }
+            
+        }
+        
+        // Action not found
+        CommitResponse r = new CommitResponse();
+        r.setStatus(Status.ERROR);
+        return r;
+    }
+	
 	
 	@RequestMapping(value = "/{action}", method = { RequestMethod.GET,	RequestMethod.POST })
 	public @ResponseBody Object performAction(
