@@ -231,8 +231,8 @@
         <property name="inputObjectId" value="feature"></property> <!-- Source of the data -->
         <property name="connectionProperties" ref="connectionProperties"/>
         <property name="typeName" value="sport" /> <!-- Target typeName that will be updated -->
-        <property name="surveyLinkingField" value="MY_ORIG_ID" /> <!-- Source property holding the ID to look for in the items table -->
-        <property name="itemLinkingField" value="GCID" /> <!-- ID property of the items table -->
+        <property name="surveyLinkingField" value="my_orig_id" /> <!-- Source property holding the ID to look for in the items table -->
+        <property name="itemLinkingField" value="gcid" /> <!-- ID property of the items table -->
         <property name="rules" ref="impiantiUpdateRules"></property>
     </bean>
  
@@ -336,8 +336,8 @@
         <property name="inputObjectId" value="feature"></property> <!-- Source of the data -->
         <property name="connectionProperties" ref="connectionProperties"/>
         <property name="typeName" value="cens_muri" /> <!-- Target typeName that will be updated -->
-        <property name="surveyLinkingField" value="MY_ORIG_ID" /> <!-- Source property holding the ID to look for in the items table -->
-        <property name="itemLinkingField" value="GCID" /> <!-- ID property of the items table -->
+        <property name="surveyLinkingField" value="my_orig_id" /> <!-- Source property holding the ID to look for in the items table -->
+        <property name="itemLinkingField" value="gcid" /> <!-- ID property of the items table -->
         <property name="rules" ref="muriUpdateRules"></property>
     </bean>
  
