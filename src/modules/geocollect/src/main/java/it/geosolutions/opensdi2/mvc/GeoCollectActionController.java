@@ -22,6 +22,10 @@ package it.geosolutions.opensdi2.mvc;
 
 import it.geosolutions.geocollect.model.http.CommitResponse;
 import it.geosolutions.geocollect.model.http.Status;
+import it.geosolutions.opensdi2.configurations.controller.OSDIModuleController;
+import it.geosolutions.opensdi2.configurations.exceptions.OSDIConfigurationException;
+import it.geosolutions.opensdi2.configurations.model.OSDIConfigurationKVP;
+import it.geosolutions.opensdi2.workflow.ActionBlock;
 import it.geosolutions.opensdi2.workflow.ActionSequence;
 import it.geosolutions.opensdi2.workflow.BaseAction;
 import it.geosolutions.opensdi2.workflow.BlockConfiguration;
@@ -32,8 +36,11 @@ import it.geosolutions.opensdi2.workflow.action.DataStoreConfiguration;
 import it.geosolutions.opensdi2.workflow.action.FeatureUpdater;
 import it.geosolutions.opensdi2.workflow.action.FeatureUpdaterConfiguration;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
 
 import org.apache.log4j.Logger;
 import org.json.simple.JSONObject;
@@ -56,7 +63,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @Controller
 @RequestMapping("/geocollect/action")
 @PreAuthorize("!hasRole('ROLE_ANONYMOUS')")
-public class GeoCollectActionController {
+public class GeoCollectActionController extends OSDIModuleController {
 	
     @Autowired
     private ApplicationContext appContext;
@@ -65,6 +72,8 @@ public class GeoCollectActionController {
 	 * Context object to store data to
 	 */
 	private WorkflowContext ctx;
+	
+	public static String GEOCOLLECT_SCOPEID = "geocollect";
 	
 	/**
 	 * DataStoreConfiguration to use
@@ -105,6 +114,7 @@ public class GeoCollectActionController {
 	public @ResponseBody Object getConfigurationList(
 	       @PathVariable("action") String action){
 
+	    
 	    BlockConfiguration ret = null;
 	    LOGGER.info("Received call for Action Configuration:" + action);
 	    
@@ -115,15 +125,48 @@ public class GeoCollectActionController {
     	        return ret;
     	    }
 	    }
+	    
 	    for(String ba_idx : configurableAction.keySet()){
 	        BaseAction ba = configurableAction.get(ba_idx);
 	        if(ba != null && ba instanceof FeatureUpdater){
+	            
 	            ret = ba.getConfiguration();
 	            if(ret != null){
+	                
 	                LOGGER.info("Retrieved BlockConfiguration of "+ba_idx);
-	                return ret;
+
+    	            try {
+    	                
+                        OSDIConfigurationKVP actionConfig = (OSDIConfigurationKVP) depot.loadExistingConfiguration(GEOCOLLECT_SCOPEID, ba.getId());
+                        
+                        if(ret instanceof FeatureUpdaterConfiguration){
+                            
+                            FeatureUpdaterConfiguration fconfig = (FeatureUpdaterConfiguration) ret;
+                            
+                            Map<String,String> rules = new HashMap<String, String>();
+                            
+                            for(String rule_key : actionConfig.getAllKeys()){
+                                
+                                if(actionConfig.getValue(rule_key) instanceof String){
+                                
+                                    rules.put(rule_key, (String) actionConfig.getValue(rule_key));
+                                }
+                                
+                            }
+                            
+                            fconfig.setRules(rules);
+                            return fconfig;
+                        }
+                        
+                        LOGGER.info("weeel done");
+                        
+                    } catch (OSDIConfigurationException e) {
+                        LOGGER.warn("Error Loading configuration", e);
+                    }
+    	            
+    	            return ret;
 	            }
-	        }
+            } 
 	    }
 	    
 	    return ret;
@@ -141,6 +184,18 @@ public class GeoCollectActionController {
 
         LOGGER.info(body.toJSONString());
         
+        Map<String, Object> rulesObj = (Map<String, Object>) body.get("rules");
+       
+        if(rulesObj == null){
+            
+            // Rules not found
+            CommitResponse r = new CommitResponse();
+            r.setMessage("Missing \"rules\" object");
+            r.setStatus(Status.ERROR);
+            return r;
+        }
+        
+        
         BlockConfiguration ret = null;
         LOGGER.info("Received call to set Action Configuration:" + action);
         
@@ -153,6 +208,28 @@ public class GeoCollectActionController {
                     BaseAction ba = configurableAction.get(ba_idx);
                     if(ba != null && ba instanceof FeatureUpdater){
                         ret = ba.getConfiguration();
+                        
+                        OSDIConfigurationKVP newConfig = new OSDIConfigurationKVP(GEOCOLLECT_SCOPEID, ba.getId());
+                        
+                        for(Object s : rulesObj.keySet()){
+                            if(s != null){
+                                newConfig.addNew(s.toString(), rulesObj.get(s));
+                            }
+                        } 
+                        
+                        try {
+                            depot.addNewConfiguration(newConfig);
+                        } catch (OSDIConfigurationException e) {
+                            try {
+                                depot.updateExistingConfiguration(newConfig);
+                            } catch (OSDIConfigurationException e1) {
+                                // ignore
+                            }
+                        }
+                        
+                        CommitResponse r = new CommitResponse();
+                        r.setStatus(Status.SUCCESS);
+                        return r;
                         
                     }
                 }
@@ -221,7 +298,53 @@ public class GeoCollectActionController {
 				ctx.addContextElement(INPUT_ID, body.toJSONString());
 				
 				// execute the action sequence
-				actionsMapping.get(action).execute(ctx);
+				ActionSequence sequence = actionsMapping.get(action);
+
+				
+		        for(ActionBlock actionBlock : sequence.getActions()){
+		            
+		            if(actionBlock != null && actionBlock instanceof FeatureUpdater){
+		                
+		                BlockConfiguration ret = actionBlock.getConfiguration();
+		                if(ret != null){
+		                    
+		                    LOGGER.info("Retrieved BlockConfiguration of "+actionBlock.getId());
+
+		                    try {
+		                        
+		                        OSDIConfigurationKVP actionConfig = (OSDIConfigurationKVP) depot.loadExistingConfiguration(GEOCOLLECT_SCOPEID, actionBlock.getId());
+		                        
+		                        if(ret instanceof FeatureUpdaterConfiguration){
+		                            
+		                            FeatureUpdaterConfiguration fconfig = (FeatureUpdaterConfiguration) ret;
+		                            
+		                            Map<String,String> rules = new HashMap<String, String>();
+		                            
+		                            for(String rule_key : actionConfig.getAllKeys()){
+		                                
+		                                if(actionConfig.getValue(rule_key) instanceof String){
+		                                
+		                                    rules.put(rule_key, (String) actionConfig.getValue(rule_key));
+		                                }
+		                                
+		                            }
+		                            
+		                            fconfig.setRules(rules);
+
+		                        }
+		                        
+		                        LOGGER.info("weeel done");
+		                        
+		                    } catch (OSDIConfigurationException e) {
+		                        LOGGER.warn("Error Loading configuration", e);
+		                    }
+
+		                }
+		            } 
+		        }
+
+				
+				sequence.execute(ctx);
 				
 				if(WorkflowStatus.Status.COMPLETED == ctx.getStatusElements().get(WRITER_ID).getCurrentStatus()){
 					
@@ -272,4 +395,9 @@ public class GeoCollectActionController {
 	public void setActionsMapping(Map<String, ActionSequence> actionsMapping) {
 		this.actionsMapping = actionsMapping;
 	}
+
+    @Override
+    public String getInstanceID(HttpServletRequest req) {
+        return "";
+    }
 }
