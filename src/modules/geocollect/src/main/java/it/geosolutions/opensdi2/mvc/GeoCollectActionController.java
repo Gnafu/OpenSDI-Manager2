@@ -47,6 +47,7 @@ import org.json.simple.JSONObject;
 import org.opengis.filter.identity.FeatureId;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -54,6 +55,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
 /**
  * Controller for a GeoCollect Action 
  * 
@@ -110,16 +112,108 @@ public class GeoCollectActionController extends OSDIModuleController {
 	 */
 	private final static Logger LOGGER = Logger.getLogger(GeoCollectActionController.class);
 	
-	@RequestMapping(value = "/{action}/configuration", method = { RequestMethod.GET })
-	public @ResponseBody Object getConfigurationList(
-	       @PathVariable("action") String action){
+	/**
+	 * Custom Exception to return a status 404 response
+	 * @author Lorenzo Pini (lorenzo.pini@geo-solutions.it)
+	 */
+	@ResponseStatus(value = HttpStatus.NOT_FOUND)
+	public class ResourceNotFoundException extends RuntimeException {
 
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -6799140966456807323L;
+
+	}
+
+	
+	
+	@RequestMapping(value = "/{actionsequence}/configuration", method = { RequestMethod.GET })
+	public @ResponseBody Object getConfigurationList(
+	       @PathVariable("actionsequence") String actionSequenceId){
+
+	    LOGGER.info("Received call for Action Configuration:" + actionSequenceId);
 	    
-	    BlockConfiguration ret = null;
-	    LOGGER.info("Received call for Action Configuration:" + action);
-	    
-	    if(configurableAction.get(action) != null){
-    	    ret =  configurableAction.get(action).getConfiguration();
+        //////////////// BEGIN TEST  /////////////////
+        if(actionsMapping != null && actionsMapping.containsKey(actionSequenceId)){
+            ActionSequence sequence = actionsMapping.get(actionSequenceId);
+            
+            for(ActionBlock actionBlock : sequence.getActions()){
+                
+                if(actionBlock != null && actionBlock instanceof FeatureUpdater){
+                    
+                    BlockConfiguration targetConfiguration = actionBlock.getConfiguration();
+                    if(targetConfiguration != null){
+                        
+                        LOGGER.info("Retrieved BlockConfiguration of "+actionBlock.getId()+" from actionsMapping");
+
+                        if(targetConfiguration instanceof FeatureUpdaterConfiguration){
+                            
+                            try {
+                                
+                                OSDIConfigurationKVP actionConfig = (OSDIConfigurationKVP) depot.loadExistingConfiguration(GEOCOLLECT_SCOPEID, actionBlock.getId());
+                                
+                                if(targetConfiguration instanceof FeatureUpdaterConfiguration){
+                                    
+                                    FeatureUpdaterConfiguration fconfig = (FeatureUpdaterConfiguration) targetConfiguration;
+                                    
+                                    Map<String,String> rules = new HashMap<String, String>();
+                                    
+                                    for(String rule_key : actionConfig.getAllKeys()){
+                                        
+                                        if(actionConfig.getValue(rule_key) instanceof String){
+                                        
+                                            rules.put(rule_key, (String) actionConfig.getValue(rule_key));
+                                        }
+                                        
+                                    }
+                                    
+                                    fconfig.setRules(rules);
+                                    
+                                    LOGGER.info("Done from actionsMapping");
+                                    
+                                    return fconfig;
+                                }
+                                
+                            } catch (OSDIConfigurationException e) {
+                                
+                                LOGGER.warn("Error Loading configuration", e);
+                                throw new ResourceNotFoundException();
+                                /*
+                                // Action Configuration not found
+                                CommitResponse r = new CommitResponse();
+                                r.setMessage("Cannot load Action configuration for "+actionSequenceId);
+                                r.setStatus(Status.ERROR);
+                                return r;
+                                */
+                            }
+                            
+                        }
+                        
+                        LOGGER.info("Done from actionsMapping");
+
+                    }
+                }
+            }
+            
+            throw new ResourceNotFoundException();
+
+        }
+        
+        throw new ResourceNotFoundException();
+        /*
+        // ActionSequence not found
+        CommitResponse r = new CommitResponse();
+        r.setMessage("Cannot find ActionSequence "+actionSequenceId);
+        r.setStatus(Status.ERROR);
+        return r;
+        */
+
+        ///////////////////////// END TEST  /////
+        
+        /*
+	    if(configurableAction.get(actionSequenceId) != null){
+    	    ret =  configurableAction.get(actionSequenceId).getConfiguration();
     	    
     	    if(ret != null){
     	        return ret;
@@ -170,24 +264,25 @@ public class GeoCollectActionController extends OSDIModuleController {
 	    }
 	    
 	    return ret;
+	    */
     }
 	
 	/**
 	 * 
-	 * @param action
+	 * @param actionSequenceId
 	 * @return
 	 */
-    @RequestMapping(value = "/{action}/configuration", method = { RequestMethod.POST })
+    @RequestMapping(value = "/{actionsequence}/configuration", method = { RequestMethod.POST })
     public @ResponseBody Object setActionConfiguration(
-           @PathVariable("action") String action,
+           @PathVariable("actionsequence") String actionSequenceId,
            @RequestBody JSONObject body){
 
+        LOGGER.info("Received call to set Action Configuration:" + actionSequenceId);
         LOGGER.info(body.toJSONString());
         
         Map<String, Object> rulesObj = (Map<String, Object>) body.get("rules");
        
         if(rulesObj == null){
-            
             // Rules not found
             CommitResponse r = new CommitResponse();
             r.setMessage("Missing \"rules\" object");
@@ -195,12 +290,65 @@ public class GeoCollectActionController extends OSDIModuleController {
             return r;
         }
         
+        //////////////// BEGIN TEST  /////////////////
+        if(actionsMapping != null && actionsMapping.containsKey(actionSequenceId)){
+            ActionSequence sequence = actionsMapping.get(actionSequenceId);
+            
+            for(ActionBlock actionBlock : sequence.getActions()){
+                
+                if(actionBlock != null && actionBlock instanceof FeatureUpdater){
+                    
+                    BlockConfiguration targetConfiguration = actionBlock.getConfiguration();
+                    if(targetConfiguration != null){
+                        
+                        LOGGER.info("Retrieved BlockConfiguration of "+actionBlock.getId()+" from actionsMapping");
+
+                        if(targetConfiguration instanceof FeatureUpdaterConfiguration){
+                            
+                            OSDIConfigurationKVP newConfig = new OSDIConfigurationKVP(GEOCOLLECT_SCOPEID, actionBlock.getId());
+                            
+                            for(Object s : rulesObj.keySet()){
+                                if(s != null){
+                                    newConfig.addNew(s.toString(), rulesObj.get(s));
+                                }
+                            } 
+                            
+                            try {
+                                depot.addNewConfiguration(newConfig, true);
+                            } catch (OSDIConfigurationException e) {
+                                try {
+                                    depot.updateExistingConfiguration(newConfig);
+                                } catch (OSDIConfigurationException e1) {
+                                    // ignore
+                                    LOGGER.debug("Cannot create or update OSDI Configuration");
+                                }
+                            }
+                            
+                            CommitResponse r = new CommitResponse();
+                            r.setMessage("Updated configuration of "+actionBlock.getId());
+                            r.setStatus(Status.SUCCESS);
+                            return r;
+                        }
+                        
+                        LOGGER.info("Done from actionsMapping");
+
+                    }
+                }
+            }
+            
+            
+        }
+        // Action not found
+        CommitResponse r = new CommitResponse();
+        r.setMessage("Cannot find ActionSequence "+actionSequenceId);
+        r.setStatus(Status.ERROR);
+        return r;
+
+        ///////////////////////// END TEST  /////
+        /*
         
-        BlockConfiguration ret = null;
-        LOGGER.info("Received call to set Action Configuration:" + action);
-        
-        if(configurableAction.get(action) != null){
-            ret =  configurableAction.get(action).getConfiguration();
+        if(configurableAction.get(actionSequenceId) != null){
+            ret =  configurableAction.get(actionSequenceId).getConfiguration();
             
             if(ret == null){
                 
@@ -238,7 +386,7 @@ public class GeoCollectActionController extends OSDIModuleController {
             
             if(ret != null){
                 
-                LOGGER.info("Retrieved BlockConfiguration of "+action);
+                LOGGER.info("Retrieved BlockConfiguration of "+actionSequenceId);
                 
                 if(ret instanceof FeatureUpdaterConfiguration){
                     
@@ -256,12 +404,14 @@ public class GeoCollectActionController extends OSDIModuleController {
         CommitResponse r = new CommitResponse();
         r.setStatus(Status.ERROR);
         return r;
+        
+        */
     }
 	
 	
-	@RequestMapping(value = "/{action}", method = { RequestMethod.GET,	RequestMethod.POST })
+	@RequestMapping(value = "/{actionsequence}", method = { RequestMethod.GET,	RequestMethod.POST })
 	public @ResponseBody Object performAction(
-			@PathVariable("action") String action,
+			@PathVariable("actionsequence") String actionSequenceId,
 			@RequestBody JSONObject body){
 		/* get user details
 		 * UserDetails userDetails =
@@ -271,14 +421,14 @@ public class GeoCollectActionController extends OSDIModuleController {
 
 		// TODO: action "in carico" : set the corresponding feature "working_user" to the username
 		//LOGGER.info(body);
-		LOGGER.info("Received call for Action " + action);
+		LOGGER.info("Received call for Action " + actionSequenceId);
 		/*
 		for(String s : actionsMapping.keySet()){
 			LOGGER.info(s);
 		}
 		*/
 
-		if(actionsMapping.containsKey(action)){
+		if(actionsMapping.containsKey(actionSequenceId)){
 			LOGGER.info("Action Exists");
 		
 			// store the feature using a chain of Actions
@@ -298,7 +448,7 @@ public class GeoCollectActionController extends OSDIModuleController {
 				ctx.addContextElement(INPUT_ID, body.toJSONString());
 				
 				// execute the action sequence
-				ActionSequence sequence = actionsMapping.get(action);
+				ActionSequence sequence = actionsMapping.get(actionSequenceId);
 
 				
 		        for(ActionBlock actionBlock : sequence.getActions()){
@@ -330,20 +480,18 @@ public class GeoCollectActionController extends OSDIModuleController {
 		                            }
 		                            
 		                            fconfig.setRules(rules);
-
+		                            LOGGER.debug("Rules set");
 		                        }
-		                        
-		                        LOGGER.info("weeel done");
 		                        
 		                    } catch (OSDIConfigurationException e) {
 		                        LOGGER.warn("Error Loading configuration", e);
 		                    }
 
 		                }
-		            } 
+		            }
 		        }
 
-				
+				// Execute the sequence
 				sequence.execute(ctx);
 				
 				if(WorkflowStatus.Status.COMPLETED == ctx.getStatusElements().get(WRITER_ID).getCurrentStatus()){
@@ -366,15 +514,13 @@ public class GeoCollectActionController extends OSDIModuleController {
 						return r;
 					}
 					
-				}else{
-					// FAIL!
-					
-					// this will go through and the ERROR to be returned
 				}
+
+				// Failure
+				// this will go through and the ERROR to be returned
 				
 			} catch (WorkflowException wfe) {
-				// TODO Auto-generated catch block
-				wfe.printStackTrace();
+			    LOGGER.error("Error executing ActionSequence", wfe);
 			}
 			
 		}else{
@@ -382,8 +528,7 @@ public class GeoCollectActionController extends OSDIModuleController {
 		}
 		
 		CommitResponse r = new CommitResponse();
-		r.setId("2");
-		
+		r.setId("-1");
 		r.setStatus(Status.ERROR);
 		return r;
 	}
