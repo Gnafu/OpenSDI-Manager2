@@ -11,7 +11,7 @@
     	<property name="proxy"><ref bean="proxyService"/></property>
     	<property name="urlsWrapped">
 	    	<map>
-		        <entry key="geostore" value="http://192.168.1.69/geostore" />
+		        <entry key="geostore" value="http://localhost/geostore" />
 		    </map> 
 	    </property>
     	<!-- Customized proxied -->
