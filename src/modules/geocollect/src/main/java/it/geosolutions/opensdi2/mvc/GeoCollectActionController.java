@@ -218,7 +218,7 @@ public class GeoCollectActionController extends OSDIModuleController {
                         } 
                         
                         try {
-                            depot.addNewConfiguration(newConfig);
+                            depot.addNewConfiguration(newConfig, true);
                         } catch (OSDIConfigurationException e) {
                             try {
                                 depot.updateExistingConfiguration(newConfig);
