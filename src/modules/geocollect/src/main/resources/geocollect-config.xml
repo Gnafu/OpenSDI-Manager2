@@ -80,7 +80,7 @@
     <util:map id="connectionProperties">
         <entry key="dbtype" value="postgis"/>
         <entry key="database" value="genova"/>
-        <entry key="host" value="192.168.1.69"/>
+        <entry key="host" value="localhost"/>
         <entry key="port" value="5432"/>
         <entry key="schema" value="public"/>
         <entry key="user" value="postgres"/>
@@ -220,9 +220,32 @@
     </bean>
     
     <!-- Sopralluoghi Impianti Sportivi Bolzano -->
+    
+    <!-- Rules defines the keys in the output object to be assigned with the computed "value" from the input object -->
+    <util:map id="impiantiUpdateRules" map-class="java.util.HashMap">
+        <entry key="numero_civ" value="numero_civ" />
+        <entry key="cviadesc" value="cviadesc" />
+    </util:map>
+
+    <bean id="fUpdaterImpiantiConfig" class="it.geosolutions.opensdi2.workflow.action.FeatureUpdaterConfiguration">
+        <property name="inputObjectId" value="feature"></property> <!-- Source of the data -->
+        <property name="connectionProperties" ref="connectionProperties"/>
+        <property name="typeName" value="sport" /> <!-- Target typeName that will be updated -->
+        <property name="surveyLinkingField" value="MY_ORIG_ID" /> <!-- Source property holding the ID to look for in the items table -->
+        <property name="itemLinkingField" value="GCID" /> <!-- ID property of the items table -->
+        <property name="rules" ref="impiantiUpdateRules"></property>
+    </bean>
+ 
+    <bean id="updateOriginItemImpianti" class="it.geosolutions.opensdi2.workflow.action.FeatureUpdater">
+        <property name="configuration" ref="fUpdaterImpiantiConfig"></property>
+        <property name="attributeMappings" ref="writerMappings"/>
+        <property name="id" value="impiantiFeatureUpdater"></property>
+    </bean>
+    
     <util:list id="impiantiSopActions">
-            <ref bean="action1"></ref>
-            <ref bean="impiantiSopStoreAction"></ref>
+        <ref bean="action1"></ref>
+        <ref bean="impiantiSopStoreAction"></ref>
+        <ref bean="updateOriginItemImpianti"></ref>
     </util:list>
     
     <bean id="impiantiSopStoreAction" class="it.geosolutions.opensdi2.workflow.action.DataStoreWriter">
@@ -268,10 +291,11 @@
         <property name="id" value="muriSegSequence"></property>
     </bean>
 
-        <!-- Sopralluoghi Muri Genova -->
+    <!-- Sopralluoghi Muri Genova -->
     <util:list id="muriSopActions">
-            <ref bean="action1"></ref>
-            <ref bean="muriSopStoreAction"></ref>
+        <ref bean="action1"></ref>
+        <ref bean="muriSopStoreAction"></ref>
+        <ref bean="updateOriginItemMuri"></ref>
     </util:list>
     
     <bean id="muriSopStoreAction" class="it.geosolutions.opensdi2.workflow.action.DataStoreWriter">
@@ -302,6 +326,25 @@
         <property name="inputObjectId" value="feature"></property>
         <property name="connectionProperties" ref="connectionProperties"/>
         <property name="typeName" value="cens_muri" />
+    </bean>
+    
+    <util:map id="muriUpdateRules" map-class="java.util.HashMap">
+        <entry key="civico" value="civico" />
+    </util:map>
+
+    <bean id="fUpdaterMuriConfig" class="it.geosolutions.opensdi2.workflow.action.FeatureUpdaterConfiguration">
+        <property name="inputObjectId" value="feature"></property> <!-- Source of the data -->
+        <property name="connectionProperties" ref="connectionProperties"/>
+        <property name="typeName" value="cens_muri" /> <!-- Target typeName that will be updated -->
+        <property name="surveyLinkingField" value="MY_ORIG_ID" /> <!-- Source property holding the ID to look for in the items table -->
+        <property name="itemLinkingField" value="GCID" /> <!-- ID property of the items table -->
+        <property name="rules" ref="muriUpdateRules"></property>
+    </bean>
+ 
+    <bean id="updateOriginItemMuri" class="it.geosolutions.opensdi2.workflow.action.FeatureUpdater">
+        <property name="configuration" ref="fUpdaterMuriConfig"></property>
+        <property name="attributeMappings" ref="writerMappings"/>
+        <property name="id" value="muriFeatureUpdater"></property>
     </bean>
     
     
