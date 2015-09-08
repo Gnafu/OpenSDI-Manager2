@@ -76,10 +76,10 @@
 
     </bean>
 
-    <!-- GeoTools DataStore conntection properties -->
+    <!-- GeoTools DataStore connection properties -->
     <util:map id="connectionProperties">
         <entry key="dbtype" value="postgis"/>
-        <entry key="database" value="genova"/>
+        <entry key="database" value="geocollect"/>
         <entry key="host" value="localhost"/>
         <entry key="port" value="5432"/>
         <entry key="schema" value="public"/>
@@ -121,6 +121,12 @@
         <property name="id" value="writer"></property>
     </bean>
     
+    <bean id="metadataUpdater" class="it.geosolutions.opensdi2.workflow.action.MetadataUpdater">
+        <property name="configuration" ref="action3Config"></property>
+        <!-- property name="attributeMappings" ref="writerMappings"/-->
+        <property name="id" value="metadata"></property>
+    </bean>
+    
     <bean id="action4" class="it.geosolutions.opensdi2.workflow.action.EmailAction">
         <property name="configuration" ref="action4Config"></property>
         <property name="id" value="mailer"></property>
@@ -152,6 +158,7 @@
     <util:list id="storeSopActions">
             <ref bean="action1"></ref>
             <!-- <ref bean="action2"></ref> -->   <!-- This is the transform -->
+            <ref bean="metadataUpdater"></ref>
             <ref bean="action3"></ref>
             <!-- ref bean="action4"></ref-->
             <ref bean="updateOriginItemDiscariche"></ref>

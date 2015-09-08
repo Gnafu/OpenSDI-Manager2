@@ -49,6 +49,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -446,6 +448,11 @@ public class GeoCollectActionController extends OSDIModuleController {
 				
 				// add the input
 				ctx.addContextElement(INPUT_ID, body.toJSONString());
+				
+				String username = SecurityContextHolder.getContext().getAuthentication().getName();
+				LOGGER.info("User : "+username);
+				
+				ctx.addContextElement("USERNAME", username);
 				
 				// execute the action sequence
 				ActionSequence sequence = actionsMapping.get(actionSequenceId);
