@@ -24,13 +24,16 @@ import it.geosolutions.opensdi2.workflow.BaseAction;
 import it.geosolutions.opensdi2.workflow.BlockConfiguration;
 import it.geosolutions.opensdi2.workflow.WorkflowContext;
 import it.geosolutions.opensdi2.workflow.WorkflowException;
+import it.geosolutions.opensdi2.workflow.utils.GeoCollectUtils;
 
 import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.sql.Timestamp;
+import java.util.HashMap;
 import java.util.Map;
 
+import org.geotools.data.DataStore;
 import org.opengis.feature.simple.SimpleFeature;
+import org.opengis.feature.simple.SimpleFeatureType;
 
 /**
  * Updates an input {@link SimpleFeature} properties adding:
@@ -42,8 +45,15 @@ import org.opengis.feature.simple.SimpleFeature;
  * @author Lorenzo Pini (lorenzo.pini@geo-solutions.it)
  */
 public class MetadataUpdater extends BaseAction {
+	
+	public static String CTX_METADATA_USERNAME = "USERNAME";
+	
+	public static String METADATA_USERNAME = "gc_up_user";
+	public static String METADATA_TIMESTAMP = "gc_created";
+	
 	private String inputId = "input";
 	private DataStoreConfiguration dataStoreConfiguration;
+	private Map<String, String> attributeMappings = new HashMap<String, String>();	
 	
 	@Override
 	public void executeAction(WorkflowContext ctx) throws WorkflowException {
@@ -51,15 +61,66 @@ public class MetadataUpdater extends BaseAction {
 		Object inputObj = ctx.getContextElement(inputId);
 		if(inputObj != null && inputObj instanceof SimpleFeature) {
 			SimpleFeature feature = (SimpleFeature)inputObj;
-			feature.setAttribute("DATA_AGG", new SimpleDateFormat("dd/MMMM/yyyy").format(new Date()));
-			feature.setAttribute("NOME_RILEVATORE", ctx.getContextElement("USERNAME"));
+			DataStore store = null;
+			
+			// Create a new feature with the correct output attributes
+			try {
+				store = dataStoreConfiguration.getDataStore();
+
+				if(store == null) {
+					throw new WorkflowException("Cannot connect to the DataStore");
+				}
+				
+				String typeName = getTypeName(ctx, feature);
+				feature = GeoCollectUtils.cloneFeature(store, typeName, feature, attributeMappings);
+				
+			} catch (IOException e) {
+				throw new WorkflowException("Error writing to the underlying DataStore", e);
+			}
+			
+			
+			SimpleFeatureType sfType = feature.getFeatureType();
+			if(sfType != null){
+				
+				if(sfType.indexOf(METADATA_USERNAME) > -1 ){
+					Object username = ctx.getContextElement(CTX_METADATA_USERNAME);
+					if(username != null){
+						// Add the current logged User
+						feature.setAttribute(METADATA_USERNAME, username);
+					}
+				}
+				
+				if(sfType.indexOf(METADATA_TIMESTAMP) > -1 ){
+					// Add the current time
+					feature.setAttribute(METADATA_TIMESTAMP, new Timestamp(System.currentTimeMillis()));
+				}
+			}
 			
 			ctx.addContextElement(inputId, feature);
+			
 		} else {
 			throw new IllegalArgumentException("Invalid input: must be a SimpleFeature object");
 		}
 	}
 
+	/**
+	 * Returns the typename of the given {@link SimpleFeature}
+	 * @param ctx
+	 * @param feature
+	 * @return
+	 */
+	private String getTypeName(WorkflowContext ctx, SimpleFeature feature) {
+		String typeName = feature.getType().getName().getLocalPart();
+		if(dataStoreConfiguration.getTypeNameInContext() != null && 
+				ctx.getContextElement(dataStoreConfiguration.getTypeNameInContext()) != null) {
+			typeName = (String)ctx.getContextElement(dataStoreConfiguration.getTypeNameInContext());
+		} else if(dataStoreConfiguration.getTypeName() != null) { 
+			typeName = dataStoreConfiguration.getTypeName();
+		}
+		return typeName;
+	}
+	
+	
 	@Override
 	public void setConfiguration(BlockConfiguration config) {
 		super.setConfiguration(config);
@@ -72,12 +133,11 @@ public class MetadataUpdater extends BaseAction {
 	}
 
 	public Map<String, String> getAttributeMappings() {
-		//return attributeMappings;
-		return null;
+		return attributeMappings;
 	}
 
 	public void setAttributeMappings(Map<String, String> attributeMappings) {
-		//this.attributeMappings = attributeMappings;
+		this.attributeMappings = attributeMappings;
 	}
 	
 	
