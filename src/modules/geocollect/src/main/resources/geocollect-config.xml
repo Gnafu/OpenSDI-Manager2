@@ -111,6 +111,10 @@
         <entry key="geom" value="geometry" />
     </util:map>
 
+    <util:map id="geom_geom_mapping">
+        <entry key="geom" value="geom" />
+    </util:map>
+    
     <bean id="rifiutiSopStore" class="it.geosolutions.opensdi2.workflow.action.DataStoreWriter">
         <property name="configuration" ref="rifiutiSopDatastoreConfig"></property>
         <property name="attributeMappings" ref="identityMapping"/>
@@ -324,7 +328,7 @@
     
     <bean id="muriSopStoreAction" class="it.geosolutions.opensdi2.workflow.action.DataStoreWriter">
         <property name="configuration" ref="muriSopStoreActionConfig"></property>
-        <property name="attributeMappings" ref="to_geom_mapping"/>
+        <property name="attributeMappings" ref="geom_geom_mapping"/>
         <property name="id" value="writer"></property>
     </bean>
     
@@ -349,7 +353,7 @@
     
     <bean id="muriSegStoreAction" class="it.geosolutions.opensdi2.workflow.action.DataStoreWriter">
         <property name="configuration" ref="muriSegStoreActionConfig"></property>
-        <property name="attributeMappings" ref="to_geom_mapping"/>
+        <property name="attributeMappings" ref="geom_geom_mapping"/>
         <property name="id" value="writer"></property>
     </bean>
     
